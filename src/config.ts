@@ -1,0 +1,109 @@
+/**
+ * Configuration. One typed object assembled from the environment, with safe
+ * defaults so the system boots fully in-memory (no keys, no network) for dev,
+ * tests, and the smoke run.
+ */
+
+import type { Frost } from "./domain/ids.ts";
+
+export interface GameConfig {
+  rakeBps: number; // basis points of the losers' pool → Manager's Pot
+  minParticipants: number; // thin-pool threshold
+  minStake: Frost; // smallest allowed stake (FROST)
+  namespacePrefix: string; // Walrus namespace prefix, e.g. "gaffer"
+}
+
+export interface AppConfig {
+  port: number;
+  /** Durable event-log path (SQLite). Unset → in-memory (state lost on restart). */
+  eventLogPath?: string;
+  anthropicApiKey?: string;
+  /** The Gaffer's voice. Cheapest capable model by default; verdict can upgrade. */
+  models: { default: string; verdict: string };
+  memwal?: { privateKey: string; accountId: string; serverUrl?: string };
+  football?: {
+    apiKey: string;
+    baseUrl: string;
+    competitions: { league: number; season: number }[];
+    cacheTtlMs: number;
+  };
+  /** football-data.org — free tier covers the live World Cup (code "WC"). */
+  footballData?: {
+    apiKey: string;
+    baseUrl: string;
+    competitions: string[];
+    cacheTtlMs: number;
+  };
+  sui: { rpcUrl: string; sessionsAddress?: string; sessionsKey?: string; walCoinType?: string };
+  /** Auth / embedded wallets (Privy). Verified server-side; users never see crypto. */
+  privy?: { appId: string; appSecret?: string; verificationKey?: string };
+  game: GameConfig;
+}
+
+const num = (v: string | undefined, fallback: number): number => {
+  const n = v ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : fallback;
+};
+
+/** Parse "1:2026,39:2025" → [{league:1,season:2026},{league:39,season:2025}]. */
+function parseCompetitions(raw: string | undefined): { league: number; season: number }[] | undefined {
+  if (!raw) return undefined;
+  const out = raw
+    .split(",")
+    .map((pair) => pair.split(":").map((n) => Number(n.trim())))
+    .filter(([l, s]) => Number.isFinite(l) && Number.isFinite(s))
+    .map(([league, season]) => ({ league: league as number, season: season as number }));
+  return out.length ? out : undefined;
+}
+
+export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
+  const cfg: AppConfig = {
+    port: num(env.PORT, 8787),
+    models: {
+      default: env.GAFFER_MODEL ?? "claude-haiku-4-5",
+      // The Verdict is the shareable, viral artifact — worth the flagship model.
+    verdict: env.GAFFER_VERDICT_MODEL ?? "claude-opus-4-8",
+    },
+    sui: { rpcUrl: env.SUI_RPC_URL ?? "https://fullnode.mainnet.sui.io:443" },
+    game: {
+      rakeBps: num(env.RAKE_BPS, 250),
+      minParticipants: num(env.MIN_PARTICIPANTS, 3),
+      minStake: BigInt(env.MIN_STAKE_FROST ?? "10000000"), // 0.01 WAL
+      namespacePrefix: env.MEMWAL_NAMESPACE_PREFIX ?? "gaffer",
+    },
+  };
+  if (env.EVENT_LOG_PATH) cfg.eventLogPath = env.EVENT_LOG_PATH;
+  if (env.ANTHROPIC_API_KEY) cfg.anthropicApiKey = env.ANTHROPIC_API_KEY;
+  if (env.MEMWAL_PRIVATE_KEY && env.MEMWAL_ACCOUNT_ID) {
+    cfg.memwal = { privateKey: env.MEMWAL_PRIVATE_KEY, accountId: env.MEMWAL_ACCOUNT_ID };
+    if (env.MEMWAL_SERVER_URL) cfg.memwal.serverUrl = env.MEMWAL_SERVER_URL;
+  }
+  if (env.API_FOOTBALL_KEY) {
+    cfg.football = {
+      apiKey: env.API_FOOTBALL_KEY,
+      baseUrl: env.API_FOOTBALL_BASE ?? "https://v3.football.api-sports.io",
+      // World Cup (league 1, season 2026) is the flagship; add more "league:season"
+      // pairs (comma-separated) to feature other competitions — it's a platform.
+      competitions: parseCompetitions(env.FOOTBALL_COMPETITIONS) ?? [{ league: 1, season: 2026 }],
+      cacheTtlMs: num(env.API_FOOTBALL_CACHE_TTL_MS, 900_000), // 15 min — stays under the free tier
+    };
+  }
+  if (env.FOOTBALL_DATA_API_KEY) {
+    cfg.footballData = {
+      apiKey: env.FOOTBALL_DATA_API_KEY,
+      baseUrl: env.FOOTBALL_DATA_BASE ?? "https://api.football-data.org/v4",
+      // World Cup ("WC") by default; comma-separated competition codes for more.
+      competitions: (env.FOOTBALL_DATA_COMPETITIONS ?? "WC").split(",").map((c) => c.trim()).filter(Boolean),
+      cacheTtlMs: num(env.FOOTBALL_DATA_CACHE_TTL_MS, 60_000), // free tier = 10 req/min; cache keeps us ~1/min
+    };
+  }
+  if (env.SESSIONS_WALLET_ADDRESS) cfg.sui.sessionsAddress = env.SESSIONS_WALLET_ADDRESS;
+  if (env.SESSIONS_WALLET_KEY) cfg.sui.sessionsKey = env.SESSIONS_WALLET_KEY;
+  if (env.WAL_COIN_TYPE) cfg.sui.walCoinType = env.WAL_COIN_TYPE;
+  if (env.PRIVY_APP_ID) {
+    cfg.privy = { appId: env.PRIVY_APP_ID };
+    if (env.PRIVY_APP_SECRET) cfg.privy.appSecret = env.PRIVY_APP_SECRET;
+    if (env.PRIVY_VERIFICATION_KEY) cfg.privy.verificationKey = env.PRIVY_VERIFICATION_KEY;
+  }
+  return cfg;
+}
