@@ -61,6 +61,9 @@ export class Engine {
   withdraw(wallet: Wallet, amount: Frost) {
     return this.registry.for(wallet).withdraw(amount);
   }
+  claimWelcomeGrant(wallet: Wallet) {
+    return this.registry.for(wallet).claimWelcomeGrant(this.deps.config.welcomeGrant);
+  }
   makeCall(wallet: Wallet, input: MakeCallInput) {
     return this.registry.for(wallet).makeCall(input);
   }

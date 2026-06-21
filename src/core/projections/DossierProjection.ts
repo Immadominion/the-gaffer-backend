@@ -32,6 +32,7 @@ interface DossierState {
   signedAt: number;
   balance: Frost; // free, withdrawable
   locked: Frost; // staked, awaiting settlement
+  bonus: Frost; // non-withdrawable starter bonus
   gr: number;
   pnl: Frost; // realised
   won: number;
@@ -51,6 +52,7 @@ export interface DossierView {
   signedAt: number;
   balance: Frost;
   locked: Frost;
+  bonus: Frost;
   gr: number;
   tier: Tier;
   nextTier: { tier: Tier; min: number } | null;
@@ -79,6 +81,7 @@ export class DossierProjection implements Projection {
           signedAt: event.meta.at,
           balance: 0n,
           locked: 0n,
+          bonus: 0n,
           gr: BASE_GR,
           pnl: 0n,
           won: 0,
@@ -102,10 +105,18 @@ export class DossierProjection implements Projection {
         if (s) s.balance -= p.amount;
         return;
       }
+      case "WelcomeGranted": {
+        const s = this.walletOf(event);
+        if (s) s.bonus += p.amount;
+        return;
+      }
       case "CallMade": {
         const s = this.walletOf(event);
         if (!s) return;
-        s.balance -= p.stake;
+        // Spend the non-withdrawable bonus first, then free balance.
+        const fromBonus = s.bonus < p.stake ? s.bonus : p.stake;
+        s.bonus -= fromBonus;
+        s.balance -= p.stake - fromBonus;
         s.locked += p.stake;
         s.openCalls.set(p.callId, {
           callId: p.callId,
@@ -211,6 +222,7 @@ function toView(s: DossierState): DossierView {
     signedAt: s.signedAt,
     balance: s.balance,
     locked: s.locked,
+    bonus: s.bonus,
     gr: s.gr,
     tier,
     nextTier: nextTierFloor(s.gr),

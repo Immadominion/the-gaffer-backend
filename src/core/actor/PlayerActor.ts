@@ -103,13 +103,27 @@ export class PlayerActor {
     });
   }
 
+  /** One-time, non-withdrawable starter bonus. Idempotent per stream. */
+  claimWelcomeGrant(amount: Frost): Promise<{ bonus: Frost }> {
+    return this.mailbox.run(async () => {
+      this.requireSigned();
+      if (amount <= 0n) fail("INVALID", "grant must be positive");
+      const events = await this.deps.store.readStream(this.streamId);
+      if (events.some((e) => e.payload.type === "WelcomeGranted")) {
+        fail("CONFLICT", "you've already claimed your starter balance");
+      }
+      await this.append([{ type: "WelcomeGranted", amount }]);
+      return { bonus: this.requireSigned().bonus };
+    });
+  }
+
   makeCall(input: MakeCallInput): Promise<{ callId: CallId; impliedProbAtCall: number }> {
     return this.mailbox.run(async () => {
       const d = this.requireSigned();
       if (input.stake < this.deps.config.minStake) {
         fail("STAKE_TOO_SMALL", "stake below the minimum");
       }
-      if (d.balance < input.stake) fail("INSUFFICIENT_BALANCE", "not enough free balance");
+      if (d.balance + d.bonus < input.stake) fail("INSUFFICIENT_BALANCE", "not enough balance to back this call");
 
       const match = this.deps.readModel.pots.getMatch(input.matchId);
       if (!match) throw new DomainError("MATCH_NOT_OPEN", "no such match");

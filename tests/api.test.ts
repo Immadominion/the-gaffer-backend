@@ -69,6 +69,7 @@ describe("tRPC API", () => {
     const pub = await anon.dossier({ wallet: "0xalice" });
     expect(pub).not.toBeNull();
     expect(pub as object).not.toHaveProperty("balance");
+    expect(pub as object).not.toHaveProperty("bonus");
     expect(pub as object).not.toHaveProperty("openCalls");
   });
 
@@ -79,5 +80,30 @@ describe("tRPC API", () => {
     await dave.signContract({});
     // no deposit → staking must fail
     await expect(dave.makeCall({ matchId, bucket: "HOME", stake: wal(10) })).rejects.toThrow();
+  });
+
+  test("welcome grant: spendable on calls, not withdrawable, one-time", async () => {
+    const app = await freshApp();
+    const matchId = app.readModel.pots.openFixtures()[0]!.matchId as MatchId;
+    const eve = appRouter.createCaller({ app, wallet: asWallet("0xeve") });
+    await eve.signContract({ handle: "Eve" });
+
+    await eve.claimWelcomeGrant();
+    let me = await eve.me();
+    expect(me!.bonus).toBe(wal(50));
+    expect(me!.balance).toBe(0n);
+
+    // one-time: a second claim is rejected
+    await expect(eve.claimWelcomeGrant()).rejects.toThrow();
+
+    // bonus is spendable on a call with no deposit
+    await eve.makeCall({ matchId, bucket: "HOME", stake: wal(10) });
+    me = await eve.me();
+    expect(me!.bonus).toBe(wal(40));
+    expect(me!.locked).toBe(wal(10));
+    expect(me!.balance).toBe(0n);
+
+    // ...but it cannot be withdrawn — only free balance is
+    await expect(eve.withdraw({ amount: wal(5) })).rejects.toThrow(/balance/i);
   });
 });

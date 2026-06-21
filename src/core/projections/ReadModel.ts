@@ -11,6 +11,7 @@ import type { FormState } from "../../game/form.ts";
 import type { EventStore } from "../eventstore/EventStore.ts";
 import { DossierProjection, type DossierView } from "./DossierProjection.ts";
 import { PotProjection } from "./PotProjection.ts";
+import { SettledCallsProjection } from "./SettledCallsProjection.ts";
 import type { Projection } from "./Projection.ts";
 
 export interface LeaderboardEntry {
@@ -27,7 +28,8 @@ export interface LeaderboardEntry {
 export class ReadModel {
   readonly dossier = new DossierProjection();
   readonly pots = new PotProjection();
-  private readonly projections: Projection[] = [this.dossier, this.pots];
+  readonly settled = new SettledCallsProjection();
+  private readonly projections: Projection[] = [this.dossier, this.pots, this.settled];
   private managersPot: Frost = 0n;
 
   apply(event: StoredEvent): void {
@@ -83,5 +85,9 @@ export class ReadModel {
 
   getDossier(wallet: Wallet): DossierView | undefined {
     return this.dossier.get(wallet);
+  }
+
+  settledCalls(wallet: Wallet, limit = 50) {
+    return this.settled.get(wallet, limit);
   }
 }

@@ -30,7 +30,7 @@ const matchIdOf = (e: StoredEvent): string | undefined => {
 
 /** Public Dossier: the memory in action, minus the private money columns. */
 function toPublic(d: DossierView) {
-  const { balance: _b, locked: _l, openCalls: _o, ...rest } = d;
+  const { balance: _b, locked: _l, bonus: _bonus, openCalls: _o, ...rest } = d;
   return rest;
 }
 
@@ -69,6 +69,10 @@ export const appRouter = router({
 
   me: authedProcedure.query(({ ctx }) => ctx.app.readModel.getDossier(ctx.wallet) ?? null),
 
+  settledCalls: authedProcedure
+    .input(z.object({ limit: z.number().min(1).max(100).default(50) }).optional())
+    .query(({ ctx, input }) => ctx.app.readModel.settledCalls(ctx.wallet, input?.limit ?? 50)),
+
   touchline: authedProcedure.query(({ ctx }) => {
     const dossier = ctx.app.readModel.getDossier(ctx.wallet) ?? null;
     return {
@@ -103,6 +107,10 @@ export const appRouter = router({
   deposit: authedProcedure
     .input(z.object({ amount, proof: z.string().optional() }))
     .mutation(({ ctx, input }) => guard(() => ctx.app.engine.deposit(ctx.wallet, input.amount, input.proof))),
+
+  claimWelcomeGrant: authedProcedure.mutation(({ ctx }) =>
+    guard(() => ctx.app.engine.claimWelcomeGrant(ctx.wallet)),
+  ),
 
   withdraw: authedProcedure
     .input(z.object({ amount }))

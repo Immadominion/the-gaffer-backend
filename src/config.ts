@@ -11,6 +11,7 @@ export interface GameConfig {
   minParticipants: number; // thin-pool threshold
   minStake: Frost; // smallest allowed stake (FROST)
   namespacePrefix: string; // Walrus namespace prefix, e.g. "gaffer"
+  welcomeGrant: Frost; // one-time NON-withdrawable starter bonus (play, don't cash out)
 }
 
 export interface AppConfig {
@@ -70,6 +71,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       minParticipants: num(env.MIN_PARTICIPANTS, 3),
       minStake: BigInt(env.MIN_STAKE_FROST ?? "10000000"), // 0.01 WAL
       namespacePrefix: env.MEMWAL_NAMESPACE_PREFIX ?? "gaffer",
+      // Non-withdrawable starter bonus. 50 WAL on testnet; set lower on mainnet.
+      welcomeGrant: BigInt(env.WELCOME_GRANT_FROST ?? "50000000000"),
     },
   };
   if (env.EVENT_LOG_PATH) cfg.eventLogPath = env.EVENT_LOG_PATH;

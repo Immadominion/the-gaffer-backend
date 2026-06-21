@@ -41,6 +41,12 @@ export interface Withdrawn {
   custodyRef?: string;
 }
 
+/** One-time starter bonus — spendable on calls, NOT withdrawable. */
+export interface WelcomeGranted {
+  type: "WelcomeGranted";
+  amount: Frost;
+}
+
 export interface CallMade {
   type: "CallMade";
   callId: CallId;
@@ -111,6 +117,7 @@ export type PlayerEvent =
   | PlayerSigned
   | Deposited
   | Withdrawn
+  | WelcomeGranted
   | CallMade
   | HotTakeDeclared
   | CallSettled
