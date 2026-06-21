@@ -8,15 +8,14 @@ import { createApp } from "./app.ts";
 import { startServer } from "./api/server.ts";
 
 const app = await createApp();
-await app.engine.syncFixtures();
-
 const { port } = app.config;
-startServer(app, port);
 
+// Listen first so the platform health check passes immediately; loading the
+// Matchday from the live feed must never block startup.
+startServer(app, port);
 console.log(`⚽ The Gaffer backend listening on :${port}`);
 console.log(`   wiring:          ${JSON.stringify(app.wiring)}`);
 console.log(`   Sessions wallet: ${app.engine.custody.sessionsAddress()}`);
-console.log(`   Matchday:        ${app.readModel.pots.openFixtures().length} fixtures open`);
 
 const TICK_MS = 30_000;
 const tick = async () => {
@@ -26,4 +25,9 @@ const tick = async () => {
     console.error("[tick] failed:", err);
   }
 };
-setInterval(tick, TICK_MS);
+
+app.engine
+  .syncFixtures()
+  .then(() => console.log(`   Matchday:        ${app.readModel.pots.openFixtures().length} fixtures open`))
+  .catch((err) => console.error("[boot] syncFixtures failed:", err))
+  .finally(() => setInterval(tick, TICK_MS));

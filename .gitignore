@@ -13,8 +13,8 @@ dist/
 *.tsbuildinfo
 .next/
 
-# Local data (read-model cache, rebuildable from Walrus)
-data/
+# Local read-model cache (rebuildable). Root only — must NOT match src/data (source!).
+/data/
 *.sqlite
 *.sqlite-*
 *.db
@@ -26,10 +26,10 @@ data/
 *.log
 
 # Frontend — its own repo, deploys to Vercel separately
-web/
+/web/
 
 # Redundant large 3D assets (live in the frontend's public/models)
-assets/
+/assets/
 
 # Local agent / editor config
 .claude/
