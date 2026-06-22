@@ -72,6 +72,19 @@ manage the house's bot exposure per match, and taper it as organic volume arrive
   mid-settlement can't double-pay (event sourcing + expectedVersion already guards this —
   add a test).
 
+## 10. Security (from /cso audit, 2026-06-22)
+- **Rate-limit LLM endpoints (HIGH):** `chat` + `requestVerdict` hit the paid Anthropic
+  API with no per-wallet cap. Any free signup can loop them and drain the budget. Fix:
+  per-wallet token bucket + a global daily spend circuit-breaker. (Same root as §8.)
+- **Welcome-grant laundering (MEDIUM):** grant credits non-withdrawable `bonus`, but
+  settlement credits winnings to withdrawable `balance`. Two colluding Sybil accounts can
+  convert bonus → real withdrawable WAL. Fix: taint bonus-funded winnings (credit back to
+  bonus), or gate withdrawal on a prior real deposit, or Sybil-resist signup. **Note:** the
+  demo `minParticipants` 3→2 change lowers the collusion bar — raise it before real money.
+- **Clean:** secrets gitignored + absent from history and the frontend bundle; deposit
+  proofs verified on-chain (finalized + amount + recipient + sender + replay guard); every
+  mutation is server-wallet-scoped; the sui-custody + dev-auth combo fails closed at boot.
+
 ## 9. UX / platform
 - Mobile-responsive pass (the 3D Gaffer + layouts are desktop-first).
 - Working search; richer notifications (email/push) beyond the in-app bell + .ics.

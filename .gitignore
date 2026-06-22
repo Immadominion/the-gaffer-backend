@@ -36,3 +36,6 @@ dist/
 
 # External reference doc (hackathon rules) — not part of the published backend
 context.md
+
+# local security reports / gstack state
+.gstack/
