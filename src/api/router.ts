@@ -174,11 +174,11 @@ export const appRouter = router({
         if (!expected || input.key !== expected) {
           throw new DomainError("INVALID", "not authorized to resolve matches");
         }
-        await ctx.app.engine.resolveMatch(
-          asMatchId(input.matchId),
-          { home: input.home, away: input.away },
-          "demo",
-        );
+        const mid = asMatchId(input.matchId);
+        // Seed a counterparty first (no-op if already seeded or locked), so even a
+        // solo bet placed before house liquidity existed settles for real, not void.
+        await ctx.app.engine.house.ensureSeeded(mid);
+        await ctx.app.engine.resolveMatch(mid, { home: input.home, away: input.away }, "demo");
         return { ok: true, matchId: input.matchId, score: { home: input.home, away: input.away } };
       }),
     ),

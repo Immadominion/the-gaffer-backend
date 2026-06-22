@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { appRouter } from "../src/api/router.ts";
 import { createApp } from "../src/app.ts";
 import { loadConfig } from "../src/config.ts";
-import { asWallet, isHouseWallet, wal, type MatchId } from "../src/domain/ids.ts";
+import { asMarketId, asWallet, isHouseWallet, wal, type MatchId } from "../src/domain/ids.ts";
 
 const FIXED_NOW = 1_750_000_000_000;
 
@@ -129,5 +129,26 @@ describe("demo resolve endpoint", () => {
     expect(res.ok).toBe(true);
     const me = await solo.me();
     expect(me!.record.won).toBe(1); // AWAY won 0–2
+  });
+
+  test("seeds a counterparty before settling, rescuing an unseeded solo bet", async () => {
+    const app = await freshApp({ DEMO_ADMIN_KEY: "k" }); // house enabled
+    const matchId = app.readModel.pots.openFixtures()[0]!.matchId as MatchId;
+    const w = asWallet("0xstranded");
+    const solo = appRouter.createCaller({ app, wallet: w });
+    await solo.signContract({});
+    await solo.deposit({ amount: wal(10) });
+
+    // Bet straight through the actor → bypasses engine.makeCall's just-in-time
+    // seeding, simulating a bet placed before house liquidity existed.
+    await app.engine.registry.for(w).makeCall({ matchId, marketId: asMarketId("RESULT"), bucket: "HOME", stake: wal(2) });
+
+    // On its own this would void. The resolve endpoint seeds a counterparty first.
+    const ops = appRouter.createCaller({ app });
+    await ops.resolveMatchNow({ matchId, home: 1, away: 0, key: "k" });
+
+    const me = await solo.me();
+    expect(me!.record.won).toBe(1); // settled for real…
+    expect(me!.record.voided).toBe(0); // …not voided
   });
 });
