@@ -56,7 +56,7 @@ export class PlayLedgerCustody implements Custody {
 const SUI_COIN_TYPE = "0x2::sui::SUI";
 
 /** Derive the Sui network label from an RPC URL (required by the v2 client options). */
-function networkOf(url: string): "mainnet" | "testnet" | "devnet" | "localnet" {
+export function networkOf(url: string): "mainnet" | "testnet" | "devnet" | "localnet" {
   if (url.includes("testnet")) return "testnet";
   if (url.includes("devnet")) return "devnet";
   if (url.includes("localhost") || url.includes("127.0.0.1")) return "localnet";
@@ -71,7 +71,7 @@ export interface SuiCustodyConfig {
 }
 
 /** Pull the address out of a Sui balanceChange owner, lower-cased, if it has one. */
-function ownerAddress(owner: unknown): string | undefined {
+export function ownerAddress(owner: unknown): string | undefined {
   if (owner && typeof owner === "object" && "AddressOwner" in owner) {
     return String((owner as { AddressOwner: string }).AddressOwner).toLowerCase();
   }

@@ -50,7 +50,16 @@ export interface AppConfig {
     competitions: string[];
     cacheTtlMs: number;
   };
-  sui: { rpcUrl: string; sessionsAddress?: string; sessionsKey?: string; walCoinType?: string };
+  sui: {
+    rpcUrl: string;
+    sessionsAddress?: string;
+    sessionsKey?: string;
+    walCoinType?: string;
+    /** Opt in to Privy MPC custody (no env-var key) instead of the raw keypair. */
+    privyCustody?: boolean;
+    /** external_id of the Sessions Privy wallet (default "gaffer_sessions"). */
+    sessionsExternalId?: string;
+  };
   /** Auth / embedded wallets (Privy). Verified server-side; users never see crypto. */
   privy?: { appId: string; appSecret?: string; verificationKey?: string };
   game: GameConfig;
@@ -143,6 +152,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (env.SESSIONS_WALLET_ADDRESS) cfg.sui.sessionsAddress = env.SESSIONS_WALLET_ADDRESS;
   if (env.SESSIONS_WALLET_KEY) cfg.sui.sessionsKey = env.SESSIONS_WALLET_KEY;
   if (env.WAL_COIN_TYPE) cfg.sui.walCoinType = env.WAL_COIN_TYPE;
+  if (env.PRIVY_CUSTODY === "true") cfg.sui.privyCustody = true;
+  if (env.SESSIONS_EXTERNAL_ID) cfg.sui.sessionsExternalId = env.SESSIONS_EXTERNAL_ID;
   if (env.PRIVY_APP_ID) {
     cfg.privy = { appId: env.PRIVY_APP_ID };
     if (env.PRIVY_APP_SECRET) cfg.privy.appSecret = env.PRIVY_APP_SECRET;

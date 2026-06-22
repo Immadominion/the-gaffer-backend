@@ -45,11 +45,14 @@ class PrivySuiSigner extends Signer {
   getPublicKey() {
     return this.pubkey;
   }
-  async sign(bytes: Uint8Array): Promise<Uint8Array> {
+  async sign(bytes: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
     // The SDK passes the 32-byte blake2b intent digest; Privy signs it raw (Ed25519).
     const hash = "0x" + Buffer.from(bytes).toString("hex");
     const res = await this.api.rawSign(this.walletId, { params: { hash } });
-    return Uint8Array.from(Buffer.from(String(res.signature).replace(/^0x/, ""), "hex"));
+    const sig = Buffer.from(String(res.signature).replace(/^0x/, ""), "hex");
+    const out = new Uint8Array(sig.length);
+    out.set(sig);
+    return out;
   }
 }
 

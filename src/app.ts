@@ -20,6 +20,7 @@ import { ClaudeGaffer } from "./gaffer/ClaudeGaffer.ts";
 import { ScriptedGaffer } from "./gaffer/ScriptedGaffer.ts";
 import type { Gaffer } from "./gaffer/Gaffer.ts";
 import { PlayLedgerCustody, SuiCustody, type Custody } from "./ports/Custody.ts";
+import { PrivyCustody } from "./ports/PrivyCustody.ts";
 import type { Auth } from "./auth/Auth.ts";
 import { DevAuth } from "./auth/DevAuth.ts";
 import { PrivyAuth } from "./auth/PrivyAuth.ts";
@@ -83,20 +84,37 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<App> {
   wiring.gaffer = opts.gaffer ? "custom" : config.anthropicApiKey ? "claude" : "scripted";
 
   const suiReady = !!(config.sui.sessionsAddress && config.sui.sessionsKey && config.sui.walCoinType);
+  // Privy MPC custody (no env-var key): opt-in, needs Privy creds + a WAL coin type.
+  const privyCustodyReady = !!(config.sui.privyCustody && config.privy?.appSecret && config.sui.walCoinType);
   if (!opts.custody && config.sui.sessionsKey && !config.sui.walCoinType) {
     console.warn("[custody] SESSIONS_WALLET_* set but WAL_COIN_TYPE missing → staying on play-money");
   }
-  const custody: Custody =
-    opts.custody ??
-    (suiReady
-      ? new SuiCustody({
-          rpcUrl: config.sui.rpcUrl,
-          sessionsAddress: config.sui.sessionsAddress!,
-          sessionsKey: config.sui.sessionsKey!,
-          walCoinType: config.sui.walCoinType!,
-        })
-      : new PlayLedgerCustody());
-  wiring.custody = opts.custody ? "custom" : suiReady ? "sui" : "play-money";
+  let custody: Custody;
+  if (opts.custody) {
+    custody = opts.custody;
+    wiring.custody = "custom";
+  } else if (privyCustodyReady) {
+    // The Sessions wallet is a Privy server wallet; its key never touches our env.
+    custody = await PrivyCustody.create({
+      appId: config.privy!.appId,
+      appSecret: config.privy!.appSecret!,
+      rpcUrl: config.sui.rpcUrl,
+      walCoinType: config.sui.walCoinType!,
+      ...(config.sui.sessionsExternalId ? { sessionsExternalId: config.sui.sessionsExternalId } : {}),
+    });
+    wiring.custody = "privy";
+  } else if (suiReady) {
+    custody = new SuiCustody({
+      rpcUrl: config.sui.rpcUrl,
+      sessionsAddress: config.sui.sessionsAddress!,
+      sessionsKey: config.sui.sessionsKey!,
+      walCoinType: config.sui.walCoinType!,
+    });
+    wiring.custody = "sui";
+  } else {
+    custody = new PlayLedgerCustody();
+    wiring.custody = "play-money";
+  }
 
   const matchData =
     opts.matchData ??
@@ -122,9 +140,9 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<App> {
 
   // Fail closed: real WAL custody with unverified DevAuth would let anyone drain
   // any player's funds via a forged `x-wallet` header. Never boot that combination.
-  if (wiring.custody === "sui" && wiring.auth === "dev") {
+  if ((wiring.custody === "sui" || wiring.custody === "privy") && wiring.auth === "dev") {
     throw new Error(
-      "Refusing to boot: real WAL custody (sui) requires real auth. Set PRIVY_APP_SECRET, or unset WAL_COIN_TYPE to run play-money.",
+      "Refusing to boot: real WAL custody requires real auth. Set PRIVY_APP_SECRET, or unset WAL_COIN_TYPE to run play-money.",
     );
   }
 
