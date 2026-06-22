@@ -52,14 +52,17 @@ This is what makes "on Walrus" true for the *money*, not only the memory.
 - **Custody / money-transmission review** before holding real user funds at scale — a
   deliberate legal/business decision, not a code change.
 
-## 7. Liquidity & cold-start — house / NPC bettors
+## 7. Liquidity & cold-start — house / NPC bettors  ✓ *built 2026-06-22*
 Parimutuel needs opponents: with too few players a match voids and refunds (the
-`minParticipants` rule). Seed each match's pools with synthetic "house" bettors so a real
-user always has a counterparty and bets settle for real — also the cleanest **demo** (no
-need to coordinate a second tester).
-**Trade-off:** bots make the **house a counterparty** — it funds the bot's stake and bears
-that side's risk — unlike pure player-vs-player where the house only takes rake. So cap and
-manage the house's bot exposure per match, and taper it as organic volume arrives.
+`minParticipants` rule). **Shipped:** `HouseLiquidity` seeds each touched match's result
+outcomes with float-backed synthetic bets, just-in-time on a real player's first call, so a
+solo player always has a counterparty and bets settle for real. Exposure is hard-capped
+under the float; bots are hidden from leaderboards. Paired with a key-gated `resolveMatchNow`
+(+ `scripts/demo-resolve.ts`) to settle on command in a demo.
+**Remaining:** taper bot exposure as organic volume arrives; per-match exposure tuning;
+smarter bot sizing so pre-bet odds look natural before the first real call.
+**Trade-off (by design):** bots make the **house a counterparty** — it funds the bot's
+stake and bears that side's risk — unlike pure player-vs-player where the house only rakes.
 
 ## 8. Ops, cost & abuse
 - **Rate-limit chat + verdicts** — every call hits the Anthropic API (real $); cap per user.
