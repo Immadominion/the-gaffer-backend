@@ -145,6 +145,16 @@ export class SuiCustody implements Custody {
 
   /** Pay `amount` FROST of WAL from the Sessions wallet to the player. */
   async withdraw(wallet: Wallet, amount: Frost): Promise<CustodyRef> {
+    // Pre-flight: surface a clear "paused" message rather than an opaque chain
+    // failure if the Sessions wallet can't cover the payout or the gas. Gameplay
+    // and the (ledger-only) welcome grant are unaffected by an empty float.
+    const { sui, wal } = await this.balances();
+    if (wal < amount) {
+      throw new Error("Withdrawals are temporarily paused — the Sessions wallet float is being topped up. Try again shortly.");
+    }
+    if (sui < 10_000_000n) {
+      throw new Error("Withdrawals are temporarily paused — the Sessions wallet is low on gas. Try again shortly.");
+    }
     const tx = new Transaction();
     tx.setSender(this.address);
     // coinWithBalance selects/merges/splits the Sessions wallet's WAL coins to
