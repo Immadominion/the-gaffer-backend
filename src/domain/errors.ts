@@ -15,6 +15,7 @@ export type DomainErrorCode =
   | "DUPLICATE_CALL"
   | "DUPLICATE_DEPOSIT"
   | "STAKE_TOO_SMALL"
+  | "RATE_LIMITED" // too many paid (LLM) calls — per-wallet bucket or global cap
   | "CONFLICT" // optimistic-concurrency clash on the stream
   | "INVALID";
 

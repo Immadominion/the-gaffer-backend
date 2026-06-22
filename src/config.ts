@@ -5,6 +5,7 @@
  */
 
 import type { Frost } from "./domain/ids.ts";
+import type { RateLimitConfig } from "./engine/RateLimiter.ts";
 
 export interface GameConfig {
   rakeBps: number; // basis points of the losers' pool → Manager's Pot
@@ -14,6 +15,7 @@ export interface GameConfig {
   welcomeGrant: Frost; // one-time NON-withdrawable starter bonus (play, don't cash out)
   withdrawFeeBps: number; // house fee on withdrawals — covers on-chain gas + margin
   withdrawFeeMin: Frost; // flat floor so tiny cash-outs still cover ~fixed gas
+  rateLimits: RateLimitConfig; // per-wallet buckets + global daily cap on paid LLM calls
 }
 
 export interface AppConfig {
@@ -78,6 +80,18 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       // Withdrawal fee = max(bps%, flat min) → kept by the house to cover gas.
       withdrawFeeBps: num(env.WITHDRAW_FEE_BPS, 200), // 2%
       withdrawFeeMin: BigInt(env.WITHDRAW_FEE_MIN_FROST ?? "50000000"), // 0.05 WAL
+      // Rate limits on the paid (Anthropic) endpoints. Buckets are a burst +
+      // a slow refill; the global cap is the per-day backstop against Sybils.
+      rateLimits: {
+        // Chat: 5-message burst, then ~1/min — a real conversation flows, a loop chokes.
+        chat: { capacity: num(env.RL_CHAT_BURST, 5), refillMs: num(env.RL_CHAT_REFILL_MS, 60_000) },
+        // Verdict: the expensive, deliberate call — 5-minute cooldown (burst of 2).
+        verdict: { capacity: num(env.RL_VERDICT_BURST, 2), refillMs: num(env.RL_VERDICT_REFILL_MS, 300_000) },
+        // Pre-bet read: fired by the staking UI, so looser — 10 burst, then 1/15s.
+        preBetRead: { capacity: num(env.RL_PREBET_BURST, 10), refillMs: num(env.RL_PREBET_REFILL_MS, 15_000) },
+        // Hard daily ceiling on ALL model calls, every wallet combined.
+        globalDailyCap: num(env.RL_GLOBAL_DAILY_CAP, 3000),
+      },
     },
   };
   if (env.EVENT_LOG_PATH) cfg.eventLogPath = env.EVENT_LOG_PATH;

@@ -13,6 +13,7 @@ import { VOID, type Fixture, type MarketDef, type Outcome, type VerdictTrigger }
 import { RESULT_MARKET, resolveResult, resultMarket } from "../game/markets.ts";
 import { settleParimutuel } from "../game/parimutuel.ts";
 import type { Gaffer } from "../gaffer/Gaffer.ts";
+import { RateLimiter } from "./RateLimiter.ts";
 import { ActorRegistry } from "../core/actor/ActorRegistry.ts";
 import type { EventStore } from "../core/eventstore/EventStore.ts";
 import type { ReadModel } from "../core/projections/ReadModel.ts";
@@ -32,8 +33,11 @@ export interface EngineDeps {
 export class Engine {
   readonly registry: ActorRegistry;
   private readonly matchVersions = new Map<MatchId, number>();
+  /** Per-wallet + global throttle on the paid (Anthropic) endpoints. */
+  private readonly limiter: RateLimiter;
 
   constructor(private readonly deps: EngineDeps) {
+    this.limiter = new RateLimiter(deps.config.rateLimits);
     this.registry = new ActorRegistry({
       store: deps.store,
       readModel: deps.readModel,
@@ -71,10 +75,12 @@ export class Engine {
     return this.registry.for(wallet).declareHotTake(text);
   }
   requestVerdict(wallet: Wallet, trigger: VerdictTrigger) {
+    this.limiter.charge("verdict", wallet);
     return this.registry.for(wallet).requestVerdict(trigger);
   }
 
   async chat(wallet: Wallet, message: string): Promise<string> {
+    this.limiter.charge("chat", wallet);
     const reply = await this.deps.gaffer.chat({ wallet, message });
     await this.registry.for(wallet).recordChat(message, reply);
     return reply;
@@ -92,6 +98,7 @@ export class Engine {
     wallet: Wallet,
     input: { matchId: MatchId; marketId: MarketId; bucket: string; stake: Frost },
   ): Promise<string> {
+    this.limiter.charge("preBetRead", wallet);
     const match = this.deps.readModel.pots.getMatch(input.matchId);
     if (!match) throw new Error("no such match");
     const market = match.markets.find((m) => m.marketId === input.marketId);
