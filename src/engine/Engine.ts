@@ -7,6 +7,7 @@
  */
 
 import type { GameConfig } from "../config.ts";
+import { DomainError } from "../domain/errors.ts";
 import type { DomainEvent } from "../domain/events.ts";
 import { formatWal, isHouseWallet, type Frost, type MarketId, type MatchId, type Wallet, matchStream } from "../domain/ids.ts";
 import { VOID, type Fixture, type MarketDef, type Outcome, type VerdictTrigger } from "../domain/model.ts";
@@ -19,6 +20,7 @@ import { ActorRegistry } from "../core/actor/ActorRegistry.ts";
 import type { EventStore } from "../core/eventstore/EventStore.ts";
 import type { ReadModel } from "../core/projections/ReadModel.ts";
 import type { Custody } from "../ports/Custody.ts";
+import type { DepositGateway, PrivyPlayer } from "../ports/PrivyDepositGateway.ts";
 import type { MatchDataProvider } from "../ports/MatchData.ts";
 import type { MakeCallInput } from "../core/actor/PlayerActor.ts";
 
@@ -29,6 +31,8 @@ export interface EngineDeps {
   gaffer: Gaffer;
   matchData: MatchDataProvider;
   config: GameConfig;
+  /** Custodial deposit sweeps (Privy). Absent → play-money/no on-chain deposits. */
+  depositGateway?: DepositGateway;
 }
 
 export class Engine {
@@ -65,6 +69,37 @@ export class Engine {
   }
   deposit(wallet: Wallet, amount: Frost, proof?: string) {
     return this.registry.for(wallet).deposit(amount, proof);
+  }
+
+  /**
+   * Custodial deposit: sweep any WAL that has arrived in the player's Privy wallet
+   * into the Sessions float and credit their ledger. Idempotent + reconciled — safe
+   * to call repeatedly (a "check for my deposit" button). No-op without a gateway,
+   * for an unsigned player, or for a player without a Privy wallet.
+   */
+  async syncDeposits(
+    wallet: Wallet,
+    player?: Partial<PrivyPlayer>,
+  ): Promise<{ credited: Frost; balance: Frost }> {
+    const balanceOf = (): Frost => (this.deps.readModel.getDossier(wallet)?.balance ?? 0n) as Frost;
+    const gateway = this.deps.depositGateway;
+    if (!gateway || !player?.walletId || !player?.publicKey || !this.deps.readModel.getDossier(wallet)) {
+      return { credited: 0n as Frost, balance: balanceOf() };
+    }
+    const credits = await gateway.collect({ address: wallet, walletId: player.walletId, publicKey: player.publicKey });
+    let credited = 0n;
+    for (const c of credits) {
+      try {
+        await this.registry.for(wallet).deposit(c.amount, c.digest);
+        credited += c.amount;
+      } catch (e) {
+        // Already-credited sweeps are expected (reconcile re-presents them); ignore those.
+        if (!(e instanceof DomainError && e.code === "DUPLICATE_DEPOSIT")) {
+          console.error(`[deposit] crediting ${c.digest} failed:`, e);
+        }
+      }
+    }
+    return { credited: credited as Frost, balance: balanceOf() };
   }
   withdraw(wallet: Wallet, amount: Frost) {
     return this.registry.for(wallet).withdraw(amount);

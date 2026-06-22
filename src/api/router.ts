@@ -115,6 +115,23 @@ export const appRouter = router({
     .input(z.object({ amount, proof: z.string().optional() }))
     .mutation(({ ctx, input }) => guard(() => ctx.app.engine.deposit(ctx.wallet, input.amount, input.proof))),
 
+  /** The player's deposit address (their own Privy Sui wallet) — send WAL here. */
+  depositAddress: authedProcedure.query(({ ctx }) => ({
+    address: ctx.wallet,
+    available: !!ctx.privyWalletId, // custodial sweep wired for this player
+  })),
+
+  /** Sweep + credit any WAL that has arrived at the deposit address. Idempotent. */
+  syncDeposit: authedProcedure.mutation(({ ctx }) =>
+    guard(() =>
+      ctx.app.engine.syncDeposits(ctx.wallet, {
+        address: ctx.wallet,
+        ...(ctx.privyWalletId ? { walletId: ctx.privyWalletId } : {}),
+        ...(ctx.privyPublicKey ? { publicKey: ctx.privyPublicKey } : {}),
+      }),
+    ),
+  ),
+
   claimWelcomeGrant: authedProcedure.mutation(({ ctx }) =>
     guard(() => ctx.app.engine.claimWelcomeGrant(ctx.wallet)),
   ),

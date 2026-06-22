@@ -23,7 +23,7 @@ import { networkOf, ownerAddress, type Custody, type CustodyRef } from "./Custod
 const SUI_COIN_TYPE = "0x2::sui::SUI";
 
 /** A Sui Signer backed by a Privy server wallet — sign() delegates to rawSign. */
-class PrivySuiSigner extends Signer {
+export class PrivySuiSigner extends Signer {
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private readonly wallets: any,
@@ -47,6 +47,13 @@ class PrivySuiSigner extends Signer {
     out.set(sig);
     return out;
   }
+}
+
+/** Build a Sui signer for any Privy wallet from its id + flag-prefixed pubkey hex. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function buildPrivySuiSigner(wallets: any, walletId: string, publicKeyHex: string): PrivySuiSigner {
+  const pub = new Ed25519PublicKey(Uint8Array.from(Buffer.from(publicKeyHex, "hex").subarray(1)));
+  return new PrivySuiSigner(wallets, walletId, pub);
 }
 
 export interface PrivyCustodyConfig {

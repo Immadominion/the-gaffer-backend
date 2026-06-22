@@ -22,6 +22,7 @@ import { ScriptedGaffer } from "./gaffer/ScriptedGaffer.ts";
 import type { Gaffer } from "./gaffer/Gaffer.ts";
 import { PlayLedgerCustody, SuiCustody, type Custody } from "./ports/Custody.ts";
 import { PrivyCustody } from "./ports/PrivyCustody.ts";
+import { PrivyDepositGateway, type DepositGateway } from "./ports/PrivyDepositGateway.ts";
 import type { Auth } from "./auth/Auth.ts";
 import { DevAuth } from "./auth/DevAuth.ts";
 import { PrivyAuth } from "./auth/PrivyAuth.ts";
@@ -52,6 +53,7 @@ export interface CreateAppOptions {
   gaffer?: Gaffer;
   auth?: Auth;
   custody?: Custody;
+  depositGateway?: DepositGateway;
   matchData?: MatchDataProvider;
   /** Seed the Mock provider's fixtures (ignored if matchData is supplied). */
   now?: number;
@@ -118,6 +120,20 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<App> {
     wiring.custody = "play-money";
   }
 
+  // Custodial deposits: sweep WAL from each player's Privy wallet into the float.
+  // Available exactly when Privy custody is (same creds + WAL coin type).
+  let depositGateway: DepositGateway | undefined = opts.depositGateway;
+  if (!depositGateway && privyCustodyReady) {
+    depositGateway = await PrivyDepositGateway.create({
+      appId: config.privy!.appId,
+      appSecret: config.privy!.appSecret!,
+      rpcUrl: config.sui.rpcUrl,
+      walCoinType: config.sui.walCoinType!,
+      ...(config.sui.sessionsExternalId ? { sessionsExternalId: config.sui.sessionsExternalId } : {}),
+    });
+  }
+  wiring.deposits = opts.depositGateway ? "custom" : depositGateway ? "privy-sweep" : "none";
+
   const matchData =
     opts.matchData ??
     (config.footballData
@@ -158,7 +174,15 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<App> {
   const ledgerMirror = new WalrusLedgerMirror(memory, `${config.game.namespacePrefix}:ledger`);
   ledgerMirror.attach((listener) => store.subscribe(listener));
 
-  const engine = new Engine({ store, readModel, custody, gaffer, matchData, config: config.game });
+  const engine = new Engine({
+    store,
+    readModel,
+    custody,
+    gaffer,
+    matchData,
+    config: config.game,
+    ...(depositGateway ? { depositGateway } : {}),
+  });
 
   return { config, store, readModel, engine, gaffer, auth, memory, memoryWriter, ledgerMirror, matchData, wiring };
 }

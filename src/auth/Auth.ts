@@ -12,6 +12,10 @@ import type { Wallet } from "../domain/ids.ts";
 export interface AuthedUser {
   userId: string; // provider identity (e.g. Privy user id)
   wallet: Wallet; // the player's Sui address — the in-app identity
+  /** The player's Privy wallet handle, when the provider custodies it — needed to
+   *  sweep an inbound deposit out of the player's wallet into the Sessions float. */
+  privyWalletId?: string;
+  privyPublicKey?: string; // hex, flag-prefixed Ed25519 key as Privy returns it
 }
 
 export interface Auth {

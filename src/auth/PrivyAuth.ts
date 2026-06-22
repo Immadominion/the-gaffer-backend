@@ -18,9 +18,15 @@ import type { Auth, AuthedUser } from "./Auth.ts";
 const externalId = (userId: string): string =>
   userId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 
+interface PrivyWalletInfo {
+  wallet: Wallet;
+  walletId: string;
+  publicKey: string;
+}
+
 export class PrivyAuth implements Auth {
   private readonly client: PrivyClient;
-  private readonly walletByUser = new Map<string, Wallet>();
+  private readonly walletByUser = new Map<string, PrivyWalletInfo>();
 
   constructor(appId: string, appSecret: string, verificationKey?: string) {
     this.client = new PrivyClient({
@@ -42,22 +48,31 @@ export class PrivyAuth implements Auth {
       return null; // missing / invalid / expired token → logged-out
     }
 
-    const wallet = await this.resolveWallet(userId); // may throw on a real server error
-    return { userId, wallet };
+    const info = await this.resolveWallet(userId); // may throw on a real server error
+    return {
+      userId,
+      wallet: info.wallet,
+      privyWalletId: info.walletId,
+      privyPublicKey: info.publicKey,
+    };
   }
 
-  private async resolveWallet(userId: string): Promise<Wallet> {
+  private async resolveWallet(userId: string): Promise<PrivyWalletInfo> {
     const cached = this.walletByUser.get(userId);
     if (cached) return cached;
 
     const ext = externalId(userId);
-    const created = await this.client.wallets().create({
+    const created = (await this.client.wallets().create({
       chain_type: "sui",
       external_id: ext,
       idempotency_key: `gaffer:${ext}`,
-    });
-    const wallet = asWallet((created as unknown as { address: string }).address);
-    this.walletByUser.set(userId, wallet);
-    return wallet;
+    })) as unknown as { id: string; address: string; public_key: string };
+    const info: PrivyWalletInfo = {
+      wallet: asWallet(created.address),
+      walletId: created.id,
+      publicKey: created.public_key,
+    };
+    this.walletByUser.set(userId, info);
+    return info;
   }
 }

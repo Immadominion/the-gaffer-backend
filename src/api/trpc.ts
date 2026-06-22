@@ -14,6 +14,9 @@ import type { Wallet } from "../domain/ids.ts";
 export interface Context {
   app: App;
   wallet?: Wallet;
+  /** The player's Privy wallet handle (when provider-custodied) — for deposit sweeps. */
+  privyWalletId?: string;
+  privyPublicKey?: string;
 }
 
 /**
@@ -23,7 +26,13 @@ export interface Context {
  */
 export async function makeContext(app: App, token: string | undefined): Promise<Context> {
   const user = await app.auth.verify(token ?? "");
-  return user ? { app, wallet: user.wallet } : { app };
+  if (!user) return { app };
+  return {
+    app,
+    wallet: user.wallet,
+    ...(user.privyWalletId ? { privyWalletId: user.privyWalletId } : {}),
+    ...(user.privyPublicKey ? { privyPublicKey: user.privyPublicKey } : {}),
+  };
 }
 
 const t = initTRPC.context<Context>().create({ transformer: superjson });
