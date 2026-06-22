@@ -38,6 +38,7 @@ interface MatchState {
   fixture: Fixture;
   status: MarketStatus;
   markets: Map<MarketId, MarketState>;
+  score?: { home: number; away: number }; // set on MatchResolved
 }
 
 export interface BucketView {
@@ -65,6 +66,7 @@ export interface MatchView {
   fixture: Fixture;
   status: MarketStatus;
   markets: MarketPotView[];
+  score: { home: number; away: number } | null; // final score once resolved
 }
 
 export class PotProjection implements Projection {
@@ -124,6 +126,7 @@ export class PotProjection implements Projection {
         const m = this.matches.get(p.matchId);
         if (!m) return;
         m.status = "RESOLVED";
+        m.score = p.score;
         for (const [marketId, mk] of m.markets) {
           mk.status = "RESOLVED";
           const outcome = p.outcomes[marketId];
@@ -237,5 +240,6 @@ function toMatchView(m: MatchState): MatchView {
     fixture: m.fixture,
     status: m.status,
     markets: [...m.markets.values()].map(toMarketView),
+    score: m.score ?? null,
   };
 }

@@ -74,8 +74,10 @@ export class Engine {
     return this.registry.for(wallet).requestVerdict(trigger);
   }
 
-  chat(wallet: Wallet, message: string) {
-    return this.deps.gaffer.chat({ wallet, message });
+  async chat(wallet: Wallet, message: string): Promise<string> {
+    const reply = await this.deps.gaffer.chat({ wallet, message });
+    await this.registry.for(wallet).recordChat(message, reply);
+    return reply;
   }
 
   /** Re-read a player's memory, distil behavioural traits, and persist them. */

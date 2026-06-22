@@ -114,6 +114,13 @@ export interface VerdictIssued {
   quotes: string[]; // past-self lines the Gaffer threw back
 }
 
+/** A chat turn with the Gaffer — the transcript is part of the player's memory. */
+export interface ChatExchanged {
+  type: "ChatExchanged";
+  message: string; // the player's line
+  reply: string; // the Gaffer's reply
+}
+
 export type PlayerEvent =
   | PlayerSigned
   | Deposited
@@ -125,7 +132,8 @@ export type PlayerEvent =
   | CallVoided
   | TierChanged
   | TraitObserved
-  | VerdictIssued;
+  | VerdictIssued
+  | ChatExchanged;
 
 // ── Match stream events (namespace: gaffer:match:<id>) ───────────────────────
 // Shared game state for one fixture: its market, its Pots, its result.

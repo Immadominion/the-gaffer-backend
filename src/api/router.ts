@@ -74,6 +74,10 @@ export const appRouter = router({
     .input(z.object({ limit: z.number().min(1).max(100).default(50) }).optional())
     .query(({ ctx, input }) => ctx.app.readModel.settledCalls(ctx.wallet, input?.limit ?? 50)),
 
+  chatHistory: authedProcedure
+    .input(z.object({ limit: z.number().min(1).max(100).default(50) }).optional())
+    .query(({ ctx, input }) => ctx.app.readModel.chatHistory(ctx.wallet, input?.limit ?? 50)),
+
   touchline: authedProcedure.query(({ ctx }) => {
     const dossier = ctx.app.readModel.getDossier(ctx.wallet) ?? null;
     return {

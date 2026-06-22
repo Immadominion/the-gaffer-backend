@@ -9,6 +9,7 @@ import type { Frost, Wallet } from "../../domain/ids.ts";
 import type { Tier } from "../../domain/model.ts";
 import type { FormState } from "../../game/form.ts";
 import type { EventStore } from "../eventstore/EventStore.ts";
+import { ChatProjection } from "./ChatProjection.ts";
 import { DossierProjection, type DossierView } from "./DossierProjection.ts";
 import { PotProjection } from "./PotProjection.ts";
 import { SettledCallsProjection } from "./SettledCallsProjection.ts";
@@ -29,7 +30,8 @@ export class ReadModel {
   readonly dossier = new DossierProjection();
   readonly pots = new PotProjection();
   readonly settled = new SettledCallsProjection();
-  private readonly projections: Projection[] = [this.dossier, this.pots, this.settled];
+  readonly chat = new ChatProjection();
+  private readonly projections: Projection[] = [this.dossier, this.pots, this.settled, this.chat];
   private managersPot: Frost = 0n;
   private houseRevenue: Frost = 0n; // accrued withdrawal fees (covers gas + margin)
 
@@ -95,5 +97,9 @@ export class ReadModel {
 
   settledCalls(wallet: Wallet, limit = 50) {
     return this.settled.get(wallet, limit);
+  }
+
+  chatHistory(wallet: Wallet, limit = 50) {
+    return this.chat.get(wallet, limit);
   }
 }
