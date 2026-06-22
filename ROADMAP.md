@@ -16,13 +16,15 @@ This is not a mockup. The following runs on **Sui mainnet**, end-to-end:
 - **Rate limiting** (§8/§10) on the paid LLM endpoints + a global daily cap.
 - **Withdrawals** with a house fee; **welcome grant** (non-withdrawable, idempotent).
 
-**The honest gaps** (the "last mile to real money at scale"):
-1. **Deposits don't work yet** (§2) — the only way in is the welcome grant. *Top functional gap.*
-2. ✓ **Custody hardened** (§1) — DONE 2026-06-22: live on Privy MPC custody (`0xc616e8b4…`),
-   env-var key deleted. Proven with a real on-chain withdrawal.
+**Status — the big three are now DONE:**
+1. ✓ **Deposits** (§2) — DONE 2026-06-22: each player's Privy wallet is their deposit
+   address; incoming WAL is swept into the float (player-signed Privy MPC, gas auto-topped)
+   and credited, idempotent + reconciled. Proven on mainnet (sweep `E4SHTEf4…`).
+2. ✓ **Custody hardened** (§1) — DONE: live on Privy MPC custody (`0xc616e8b4…`), env-var
+   key deleted. Proven with a real on-chain withdrawal.
 3. ✓ **Money ledger on Walrus** (§3) — built: balance-determining events mirrored to a
-   `gaffer:ledger` Walrus namespace and recoverable (re-read + re-fold). MVP via MemWal.
-Everything below is the rest of that path, with the proof-of-work that de-risks each step.
+   `gaffer:ledger` Walrus namespace and recoverable (re-read + re-fold).
+Remaining is hardening + breadth (multi-oracle, search, mobile, grant-laundering, fiat on-ramp).
 
 ## 1. Custody hardening — get the key out of an env var  *(highest priority)*
 
