@@ -37,12 +37,25 @@ env var, controlling real mainnet funds. Fine for a demo with a tiny float; not 
   BLAKE2b intent digest → `rawSign` (Ed25519) → assemble the serialized Sui signature →
   submit. Finicky and must be byte-exact.
 
-**Plan:** build a `PrivyCustody` adapter → **verify end-to-end on testnet** (Privy-managed
-wallet signs + sends a real WAL transfer) → only then create the mainnet managed wallet,
-move the float, swap `SESSIONS_WALLET_ADDRESS`, delete the env key.
+**Progress (2026-06-22):**
+- ✓ **Signing proven on testnet** (`scripts/privy-sui-sign-testnet.ts`): a Privy `sui`
+  wallet's public key derives its address, and `rawSign` over the Sui intent digest yields a
+  signature that **verifies** under that pubkey. (On-chain exec was only skipped because the
+  shared faucet IP was rate-limited — that's gas, not signing.)
+- ✓ **`PrivyCustody` adapter built** (`src/ports/PrivyCustody.ts`) — drop-in `Custody`, signs
+  payouts via Privy MPC. Opt-in via `PRIVY_CUSTODY=true`; default still the keypair, so nothing
+  changes until we cut over.
 
-**Strong alternative:** **Turnkey** has first-class, documented Sui MPC signing — likely the
-cleaner long-term custody. Keep Privy purely for auth (what it's best at).
+**Migration (the operational cutover, do when ready):**
+1. Provision the Privy Sessions wallet (external_id `gaffer_sessions`) and note its address —
+   `PRIVY_CUSTODY=true` makes `/health.sessionsWallet` show it.
+2. Move the float (WAL + a little SUI for gas) from the old env-key Sessions wallet → the new
+   Privy address.
+3. Set `PRIVY_CUSTODY=true` on Railway (Privy creds already present) and redeploy.
+4. Verify a small withdrawal end-to-end, then **delete `SESSIONS_WALLET_KEY`** from the env.
+
+**Strong alternative:** **Turnkey** has first-class, documented Sui MPC signing — kept as a
+fallback, but Privy is now proven, so we go with Privy (one fewer vendor).
 
 ## 2. Deposits  *(top functional gap — the product is unusable without it)*
 
