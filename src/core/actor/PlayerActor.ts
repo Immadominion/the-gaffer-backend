@@ -110,6 +110,24 @@ export class PlayerActor {
     });
   }
 
+  /**
+   * Idempotent house-bot setup: make sure this synthetic bettor is signed and
+   * holds its one-time, float-backed bankroll. Safe to call before every seed —
+   * it appends nothing once the bot is already set up, so it never double-funds
+   * (the cap on house exposure relies on this).
+   */
+  ensureHouseFunded(amount: Frost): Promise<void> {
+    return this.mailbox.run(async () => {
+      const events = await this.deps.store.readStream(this.streamId);
+      const signed = events.some((e) => e.payload.type === "PlayerSigned");
+      const funded = events.some((e) => e.payload.type === "HouseSeeded");
+      const toAppend: DomainEvent[] = [];
+      if (!signed) toAppend.push({ type: "PlayerSigned", wallet: this.wallet, handle: "The House" });
+      if (!funded) toAppend.push({ type: "HouseSeeded", amount });
+      if (toAppend.length) await this.append(toAppend);
+    });
+  }
+
   /** One-time, non-withdrawable starter bonus. Idempotent per stream. */
   claimWelcomeGrant(amount: Frost): Promise<{ bonus: Frost }> {
     return this.mailbox.run(async () => {

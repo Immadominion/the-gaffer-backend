@@ -8,12 +8,13 @@
 
 import type { GameConfig } from "../config.ts";
 import type { DomainEvent } from "../domain/events.ts";
-import { formatWal, type Frost, type MarketId, type MatchId, type Wallet, matchStream } from "../domain/ids.ts";
+import { formatWal, isHouseWallet, type Frost, type MarketId, type MatchId, type Wallet, matchStream } from "../domain/ids.ts";
 import { VOID, type Fixture, type MarketDef, type Outcome, type VerdictTrigger } from "../domain/model.ts";
 import { RESULT_MARKET, resolveResult, resultMarket } from "../game/markets.ts";
 import { settleParimutuel } from "../game/parimutuel.ts";
 import type { Gaffer } from "../gaffer/Gaffer.ts";
 import { RateLimiter } from "./RateLimiter.ts";
+import { HouseLiquidity } from "./HouseLiquidity.ts";
 import { ActorRegistry } from "../core/actor/ActorRegistry.ts";
 import type { EventStore } from "../core/eventstore/EventStore.ts";
 import type { ReadModel } from "../core/projections/ReadModel.ts";
@@ -35,6 +36,8 @@ export class Engine {
   private readonly matchVersions = new Map<MatchId, number>();
   /** Per-wallet + global throttle on the paid (Anthropic) endpoints. */
   private readonly limiter: RateLimiter;
+  /** Synthetic house bettors that seed each touched match with a counterparty. */
+  readonly house: HouseLiquidity;
 
   constructor(private readonly deps: EngineDeps) {
     this.limiter = new RateLimiter(deps.config.rateLimits);
@@ -45,6 +48,7 @@ export class Engine {
       gaffer: deps.gaffer,
       config: deps.config,
     });
+    this.house = new HouseLiquidity(this.registry, deps.readModel, deps.config);
   }
 
   get readModel(): ReadModel {
@@ -68,8 +72,12 @@ export class Engine {
   claimWelcomeGrant(wallet: Wallet) {
     return this.registry.for(wallet).claimWelcomeGrant(this.deps.config.welcomeGrant);
   }
-  makeCall(wallet: Wallet, input: MakeCallInput) {
-    return this.registry.for(wallet).makeCall(input);
+  async makeCall(wallet: Wallet, input: MakeCallInput) {
+    const result = await this.registry.for(wallet).makeCall(input);
+    // A real player's call seeds the match with house liquidity so they have a
+    // counterparty and the pool can settle (bots calling don't re-trigger this).
+    if (!isHouseWallet(wallet)) await this.house.ensureSeeded(input.matchId);
+    return result;
   }
   declareHotTake(wallet: Wallet, text: string) {
     return this.registry.for(wallet).declareHotTake(text);

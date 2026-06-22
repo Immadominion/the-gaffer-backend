@@ -16,12 +16,23 @@ export interface GameConfig {
   withdrawFeeBps: number; // house fee on withdrawals — covers on-chain gas + margin
   withdrawFeeMin: Frost; // flat floor so tiny cash-outs still cover ~fixed gas
   rateLimits: RateLimitConfig; // per-wallet buckets + global daily cap on paid LLM calls
+  house: HouseConfig; // synthetic house bettors that seed a counterparty per match
+}
+
+export interface HouseConfig {
+  enabled: boolean; // master switch for house liquidity seeding
+  botCount: number; // distinct house wallets (≥2 so player+bots clears minParticipants)
+  seedStake: Frost; // each bot's stake per match (FROST)
+  bankrollPerBot: Frost; // one-time, float-backed capital per bot
+  liquidityCap: Frost; // hard ceiling on total house capital (clamps bankroll × botCount)
 }
 
 export interface AppConfig {
   port: number;
   /** Durable event-log path (SQLite). Unset → in-memory (state lost on restart). */
   eventLogPath?: string;
+  /** Secret that gates the demo "resolve match now" endpoint. Unset → disabled. */
+  demoAdminKey?: string;
   anthropicApiKey?: string;
   /** The Gaffer's voice. Cheapest capable model by default; verdict can upgrade. */
   models: { default: string; verdict: string };
@@ -92,9 +103,19 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         // Hard daily ceiling on ALL model calls, every wallet combined.
         globalDailyCap: num(env.RL_GLOBAL_DAILY_CAP, 3000),
       },
+      // House liquidity — seeds a counterparty so solo bets actually settle.
+      // Just-in-time (only matches a real player touches) and float-backed.
+      house: {
+        enabled: (env.HOUSE_LIQUIDITY_ENABLED ?? "true") !== "false",
+        botCount: num(env.HOUSE_BOT_COUNT, 3), // one per outcome (HOME/AWAY/DRAW)
+        seedStake: BigInt(env.HOUSE_SEED_STAKE_FROST ?? "1000000000"), // 1 WAL per bot per match
+        bankrollPerBot: BigInt(env.HOUSE_BANKROLL_FROST ?? "10000000000"), // 10 WAL one-time per bot
+        liquidityCap: BigInt(env.HOUSE_LIQUIDITY_CAP_FROST ?? "30000000000"), // 30 WAL total exposure (< float)
+      },
     },
   };
   if (env.EVENT_LOG_PATH) cfg.eventLogPath = env.EVENT_LOG_PATH;
+  if (env.DEMO_ADMIN_KEY) cfg.demoAdminKey = env.DEMO_ADMIN_KEY;
   if (env.ANTHROPIC_API_KEY) cfg.anthropicApiKey = env.ANTHROPIC_API_KEY;
   if (env.MEMWAL_PRIVATE_KEY && env.MEMWAL_ACCOUNT_ID) {
     cfg.memwal = { privateKey: env.MEMWAL_PRIVATE_KEY, accountId: env.MEMWAL_ACCOUNT_ID };

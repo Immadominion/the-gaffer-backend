@@ -5,7 +5,7 @@
  */
 
 import type { StoredEvent } from "../../domain/events.ts";
-import type { Frost, Wallet } from "../../domain/ids.ts";
+import { isHouseWallet, type Frost, type Wallet } from "../../domain/ids.ts";
 import type { Tier } from "../../domain/model.ts";
 import type { FormState } from "../../game/form.ts";
 import type { EventStore } from "../eventstore/EventStore.ts";
@@ -59,6 +59,7 @@ export class ReadModel {
   leaderboardByGr(limit = 50): LeaderboardEntry[] {
     return this.dossier
       .all()
+      .filter((d) => !isHouseWallet(d.wallet)) // house bots never appear on the ladder
       .sort((a, b) => b.gr - a.gr)
       .slice(0, limit)
       .map((d, i) => ({
@@ -77,6 +78,7 @@ export class ReadModel {
   leaderboardByPnl(limit = 50): LeaderboardEntry[] {
     return this.dossier
       .all()
+      .filter((d) => !isHouseWallet(d.wallet)) // house bots never appear on the board
       .sort((a, b) => (b.pnl > a.pnl ? 1 : b.pnl < a.pnl ? -1 : 0))
       .slice(0, limit)
       .map((d, i) => ({

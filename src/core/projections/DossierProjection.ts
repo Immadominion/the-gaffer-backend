@@ -110,6 +110,12 @@ export class DossierProjection implements Projection {
         if (s) s.bonus += p.amount;
         return;
       }
+      case "HouseSeeded": {
+        // House bankroll is real (float-backed) betting capital, not a bonus.
+        const s = this.walletOf(event);
+        if (s) s.balance += p.amount;
+        return;
+      }
       case "CallMade": {
         const s = this.walletOf(event);
         if (!s) return;

@@ -56,3 +56,11 @@ export const newEventId = () => newId<"EventId">("evt");
 export const playerStream = (w: Wallet): string => `gaffer:${w}`;
 /** Shared game state for a single fixture. */
 export const matchStream = (m: MatchId): string => `gaffer:match:${m}`;
+
+// ── House liquidity wallets ──────────────────────────────────────────────────
+// Synthetic "house" bettors that seed a match's pools so a real player always has
+// a counterparty. They are real player streams (settlement treats them like
+// anyone else) but are filtered out of the public leaderboards.
+export const HOUSE_WALLET_PREFIX = "house:";
+export const houseWallet = (i: number): Wallet => `${HOUSE_WALLET_PREFIX}bot:${i}` as Wallet;
+export const isHouseWallet = (w: Wallet): boolean => w.startsWith(HOUSE_WALLET_PREFIX);

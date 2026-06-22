@@ -15,6 +15,7 @@ import {
   type MatchId,
 } from "../domain/ids.ts";
 import type { DossierView } from "../core/projections/DossierProjection.ts";
+import { DomainError } from "../domain/errors.ts";
 import { streamEvents } from "./eventStream.ts";
 import { authedProcedure, guard, publicProcedure, router } from "./trpc.ts";
 
@@ -154,6 +155,33 @@ export const appRouter = router({
   chat: authedProcedure
     .input(z.object({ message: z.string().min(1).max(500) }))
     .mutation(({ ctx, input }) => guard(() => ctx.app.engine.chat(ctx.wallet, input.message))),
+
+  // ── demo / ops ─────────────────────────────────────────────────────────────
+  // Resolve a match on command so settlement can be shown live without waiting
+  // for the real final whistle. Gated by DEMO_ADMIN_KEY; disabled if it's unset.
+  resolveMatchNow: publicProcedure
+    .input(
+      z.object({
+        matchId: z.string(),
+        home: z.number().int().min(0).max(99),
+        away: z.number().int().min(0).max(99),
+        key: z.string(),
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      guard(async () => {
+        const expected = ctx.app.config.demoAdminKey;
+        if (!expected || input.key !== expected) {
+          throw new DomainError("INVALID", "not authorized to resolve matches");
+        }
+        await ctx.app.engine.resolveMatch(
+          asMatchId(input.matchId),
+          { home: input.home, away: input.away },
+          "demo",
+        );
+        return { ok: true, matchId: input.matchId, score: { home: input.home, away: input.away } };
+      }),
+    ),
 
   // ── live subscriptions (pushed over WS) ────────────────────────────────────
   onMatch: publicProcedure
