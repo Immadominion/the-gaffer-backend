@@ -14,7 +14,8 @@ export type MemoryKind =
   | "hot_take" // an unstaked opinion
   | "trait" // a distilled behavioural pattern
   | "milestone" // promotion/demotion/landmark
-  | "verdict"; // a roast the Gaffer issued
+  | "verdict" // a roast the Gaffer issued
+  | "ledger"; // a balance-determining event, mirrored to Walrus for recoverability
 
 export interface MemoryRecord {
   text: string;

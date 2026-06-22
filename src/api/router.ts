@@ -43,6 +43,7 @@ export const appRouter = router({
     sessionsWallet: ctx.app.engine.custody.sessionsAddress(),
     managersPot: ctx.app.readModel.managersPotTotal(),
     houseRevenue: ctx.app.readModel.houseRevenueTotal(),
+    ledgerOnWalrus: ctx.app.ledgerMirror.count, // money events mirrored to Walrus this run
   })),
 
   // ── reads ──────────────────────────────────────────────────────────────────

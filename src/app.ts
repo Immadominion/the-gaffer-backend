@@ -16,6 +16,7 @@ import type { MemoryStore } from "./core/memory/MemoryStore.ts";
 import { ReadModel } from "./core/projections/ReadModel.ts";
 import { Engine } from "./engine/Engine.ts";
 import { MemoryWriter } from "./engine/MemoryWriter.ts";
+import { WalrusLedgerMirror } from "./engine/WalrusLedgerMirror.ts";
 import { ClaudeGaffer } from "./gaffer/ClaudeGaffer.ts";
 import { ScriptedGaffer } from "./gaffer/ScriptedGaffer.ts";
 import type { Gaffer } from "./gaffer/Gaffer.ts";
@@ -38,6 +39,7 @@ export interface App {
   auth: Auth;
   memory: MemoryStore;
   memoryWriter: MemoryWriter;
+  ledgerMirror: WalrusLedgerMirror;
   matchData: MatchDataProvider;
   /** Description of which adapters are live — handy for /health and the demo. */
   wiring: Record<string, string>;
@@ -151,7 +153,12 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<App> {
   const memoryWriter = new MemoryWriter(memory, readModel);
   memoryWriter.attach((listener) => store.subscribe(listener));
 
+  // Mirror the money-determining events to Walrus so balances are recoverable,
+  // not just a local-sqlite promise (the "money on Walrus" half of the story).
+  const ledgerMirror = new WalrusLedgerMirror(memory, `${config.game.namespacePrefix}:ledger`);
+  ledgerMirror.attach((listener) => store.subscribe(listener));
+
   const engine = new Engine({ store, readModel, custody, gaffer, matchData, config: config.game });
 
-  return { config, store, readModel, engine, gaffer, auth, memory, memoryWriter, matchData, wiring };
+  return { config, store, readModel, engine, gaffer, auth, memory, memoryWriter, ledgerMirror, matchData, wiring };
 }
