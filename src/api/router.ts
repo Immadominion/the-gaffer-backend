@@ -31,7 +31,7 @@ const matchIdOf = (e: StoredEvent): string | undefined => {
 
 /** Public Dossier: the memory in action, minus the private money columns. */
 function toPublic(d: DossierView) {
-  const { balance: _b, locked: _l, bonus: _bonus, openCalls: _o, ...rest } = d;
+  const { balance: _b, locked: _l, bonus: _bonus, claimedGrant: _c, openCalls: _o, ...rest } = d;
   return rest;
 }
 

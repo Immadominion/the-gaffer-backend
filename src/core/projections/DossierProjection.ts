@@ -33,6 +33,7 @@ interface DossierState {
   balance: Frost; // free, withdrawable
   locked: Frost; // staked, awaiting settlement
   bonus: Frost; // non-withdrawable starter bonus
+  claimedGrant: boolean; // has the one-time welcome grant been claimed (onboarding marker)
   gr: number;
   pnl: Frost; // realised
   won: number;
@@ -53,6 +54,7 @@ export interface DossierView {
   balance: Frost;
   locked: Frost;
   bonus: Frost;
+  claimedGrant: boolean;
   gr: number;
   tier: Tier;
   nextTier: { tier: Tier; min: number } | null;
@@ -82,6 +84,7 @@ export class DossierProjection implements Projection {
           balance: 0n,
           locked: 0n,
           bonus: 0n,
+          claimedGrant: false,
           gr: BASE_GR,
           pnl: 0n,
           won: 0,
@@ -107,7 +110,10 @@ export class DossierProjection implements Projection {
       }
       case "WelcomeGranted": {
         const s = this.walletOf(event);
-        if (s) s.bonus += p.amount;
+        if (s) {
+          s.bonus += p.amount;
+          s.claimedGrant = true; // durable onboarding marker — survives any client
+        }
         return;
       }
       case "HouseSeeded": {
@@ -229,6 +235,7 @@ function toView(s: DossierState): DossierView {
     balance: s.balance,
     locked: s.locked,
     bonus: s.bonus,
+    claimedGrant: s.claimedGrant,
     gr: s.gr,
     tier,
     nextTier: nextTierFloor(s.gr),
