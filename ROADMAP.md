@@ -3,6 +3,25 @@
 What's deliberately deferred past the hackathon, and the proof-of-work that de-risks it.
 The current build is a working, honest MVP; this is the path to production-grade.
 
+## Status — what's LIVE today (2026-06-22)
+
+This is not a mockup. The following runs on **Sui mainnet**, end-to-end:
+- **Auth:** Privy (email / Google / X) → server-custodied Sui wallet. Real-auth gate fails closed.
+- **Engine:** event-sourced + CQRS + actor-per-player. Parimutuel settlement with exact
+  integer money math. 38 passing tests.
+- **AI memory on Walrus:** the Gaffer chats, issues verdicts, and remembers — every call,
+  chat, and verdict persisted as Walrus blobs (memwal). This is the hackathon's core.
+- **Gameplay:** calls, live settlement, GR rating, tiers, form, leaderboards, match scores.
+- **House liquidity** (§7) so a solo player's bet settles for real, not voids.
+- **Rate limiting** (§8/§10) on the paid LLM endpoints + a global daily cap.
+- **Withdrawals** with a house fee; **welcome grant** (non-withdrawable, idempotent).
+
+**The honest gaps** (the "last mile to real money at scale"), in priority order:
+1. **Deposits don't work yet** (§2) — the only way in is the welcome grant. *Top functional gap.*
+2. **Custody key lives in an env var** (§1) — the #1 risk before real volume.
+3. **The money ledger isn't on Walrus yet** (§3) — only the *memory* is.
+Everything below is that path, with the proof-of-work that de-risks each step.
+
 ## 1. Custody hardening — get the key out of an env var  *(highest priority)*
 
 **Today:** the Sessions wallet is a raw Sui keypair with the private key in a Railway
@@ -25,11 +44,27 @@ move the float, swap `SESSIONS_WALLET_ADDRESS`, delete the env key.
 **Strong alternative:** **Turnkey** has first-class, documented Sui MPC signing — likely the
 cleaner long-term custody. Keep Privy purely for auth (what it's best at).
 
-## 2. Deposits
-- **MVP (Sui-native):** user's Privy Sui wallet → transfer WAL to the Sessions wallet →
-  pass the tx digest as `proof` to `deposit` (backend already verifies proofs).
+## 2. Deposits  *(top functional gap — the product is unusable without it)*
+
+**Today:** the "Add funds" modal calls `deposit(amount)` with **no on-chain proof**, so the
+mainnet custody check rejects it. The only way to get WAL into the system is the welcome
+grant. The backend half is done (`confirmDeposit` verifies a tx digest: finalized + credits
+the Sessions wallet by `amount` + sender check + replay guard); the **on-chain leg + the UI
+are missing.**
+
+Two buildable paths (not mutually exclusive):
+- **(A) Crypto-native, buildable now — no Privy-signing needed.** User links their own Sui
+  address, sends WAL to the Sessions wallet from it, and the deposit is credited once the tx
+  is verified (sender-bound, so it can't be front-run). Works today for crypto-native users;
+  contradicts the "no-crypto UX" goal but is a real, honest deposit path.
+- **(B) Custodial sweep — needs Privy Sui signing (couples to §1).** User funds their own
+  Privy wallet (their deposit address); the backend sweeps Privy→Sessions via `rawSign` and
+  credits. Cleaner UX, but blocked on the same Sui-signing work as custody hardening.
 - **North star (cross-chain):** deposit from any chain, settle on Sui (Wormhole / deBridge /
   Jupiter-style intents). A feature in its own right.
+
+**Fiat/card on-ramp** is a *separate* track — it needs a licensed provider (Transak/Stripe/
+etc.) and a registered business entity, so it's a business decision, not just code.
 
 ## 3. Ledger durability + verifiability — the Walrus event mirror
 The off-chain sqlite event log is the source of truth for who owns what WAL. Mirror it to
@@ -65,7 +100,8 @@ smarter bot sizing so pre-bet odds look natural before the first real call.
 stake and bears that side's risk — unlike pure player-vs-player where the house only rakes.
 
 ## 8. Ops, cost & abuse
-- **Rate-limit chat + verdicts** — every call hits the Anthropic API (real $); cap per user.
+- ✓ **Rate-limit chat + verdicts** *(built 2026-06-22)* — per-wallet token buckets + a global
+  daily cap on the paid Anthropic endpoints (`RateLimiter`). Closed the HIGH /cso finding.
 - **Back up the sqlite ledger volume** until the Walrus mirror (§3) lands.
 - **Observability:** structured logs, error alerting, settlement monitoring + reconciliation
   (ledger balances vs. on-chain wallet).
@@ -76,9 +112,8 @@ stake and bears that side's risk — unlike pure player-vs-player where the hous
   add a test).
 
 ## 10. Security (from /cso audit, 2026-06-22)
-- **Rate-limit LLM endpoints (HIGH):** `chat` + `requestVerdict` hit the paid Anthropic
-  API with no per-wallet cap. Any free signup can loop them and drain the budget. Fix:
-  per-wallet token bucket + a global daily spend circuit-breaker. (Same root as §8.)
+- ✓ **Rate-limit LLM endpoints (HIGH)** *(fixed 2026-06-22)* — per-wallet token buckets +
+  global daily cap shipped (`RateLimiter`); chat/verdict/pre-bet read all gated.
 - **Welcome-grant laundering (MEDIUM):** grant credits non-withdrawable `bonus`, but
   settlement credits winnings to withdrawable `balance`. Two colluding Sybil accounts can
   convert bonus → real withdrawable WAL. Fix: taint bonus-funded winnings (credit back to
