@@ -106,4 +106,16 @@ describe("tRPC API", () => {
     // ...but it cannot be withdrawn — only free balance is
     await expect(eve.withdraw({ amount: wal(5) })).rejects.toThrow(/balance/i);
   });
+
+  test("withdrawal takes a house fee that covers gas", async () => {
+    const app = await freshApp();
+    const al = appRouter.createCaller({ app, wallet: asWallet("0xfee") });
+    await al.signContract({ handle: "Fee" });
+    await al.deposit({ amount: wal(10) });
+    const res = await al.withdraw({ amount: wal(5) });
+    expect(res.fee).toBe(100_000_000n); // max(2% of 5 WAL, 0.05 WAL flat) = 0.1 WAL
+    expect(res.net).toBe(4_900_000_000n); // 5 WAL − 0.1 WAL reaches the player
+    const me = await al.me();
+    expect(me!.balance).toBe(wal(5)); // gross 5 WAL left the balance
+  });
 });

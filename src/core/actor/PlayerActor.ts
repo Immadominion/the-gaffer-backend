@@ -88,7 +88,7 @@ export class PlayerActor {
     });
   }
 
-  withdraw(amount: Frost): Promise<{ balance: Frost; ref: string }> {
+  withdraw(amount: Frost): Promise<{ balance: Frost; ref: string; net: Frost; fee: Frost }> {
     return this.mailbox.run(async () => {
       const d = this.requireSigned();
       if (amount <= 0n) fail("INVALID", "withdrawal must be positive");
@@ -97,9 +97,16 @@ export class PlayerActor {
           free: formatWal(d.balance),
         });
       }
-      const { ref } = await this.deps.custody.withdraw(this.wallet, amount);
-      await this.append([{ type: "Withdrawn", amount, custodyRef: ref }]);
-      return { balance: this.requireSigned().balance, ref };
+      // House fee covers the on-chain gas + margin: max(bps%, flat floor). The
+      // player's balance drops by the gross `amount`; the chain sends `net`; the
+      // `fee` stays in the Sessions wallet as house revenue.
+      const pctFee = (amount * BigInt(this.deps.config.withdrawFeeBps)) / 10000n;
+      const fee = pctFee > this.deps.config.withdrawFeeMin ? pctFee : this.deps.config.withdrawFeeMin;
+      if (amount <= fee) fail("INVALID", "withdrawal too small to cover the network fee");
+      const net = amount - fee;
+      const { ref } = await this.deps.custody.withdraw(this.wallet, net);
+      await this.append([{ type: "Withdrawn", amount, fee, custodyRef: ref }]);
+      return { balance: this.requireSigned().balance, ref, net, fee };
     });
   }
 

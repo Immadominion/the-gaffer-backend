@@ -41,6 +41,7 @@ export const appRouter = router({
     wiring: ctx.app.wiring,
     sessionsWallet: ctx.app.engine.custody.sessionsAddress(),
     managersPot: ctx.app.readModel.managersPotTotal(),
+    houseRevenue: ctx.app.readModel.houseRevenueTotal(),
   })),
 
   // ── reads ──────────────────────────────────────────────────────────────────

@@ -12,6 +12,8 @@ export interface GameConfig {
   minStake: Frost; // smallest allowed stake (FROST)
   namespacePrefix: string; // Walrus namespace prefix, e.g. "gaffer"
   welcomeGrant: Frost; // one-time NON-withdrawable starter bonus (play, don't cash out)
+  withdrawFeeBps: number; // house fee on withdrawals — covers on-chain gas + margin
+  withdrawFeeMin: Frost; // flat floor so tiny cash-outs still cover ~fixed gas
 }
 
 export interface AppConfig {
@@ -73,6 +75,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       namespacePrefix: env.MEMWAL_NAMESPACE_PREFIX ?? "gaffer",
       // Non-withdrawable starter bonus. 50 WAL on testnet; set lower on mainnet.
       welcomeGrant: BigInt(env.WELCOME_GRANT_FROST ?? "50000000000"),
+      // Withdrawal fee = max(bps%, flat min) → kept by the house to cover gas.
+      withdrawFeeBps: num(env.WITHDRAW_FEE_BPS, 200), // 2%
+      withdrawFeeMin: BigInt(env.WITHDRAW_FEE_MIN_FROST ?? "50000000"), // 0.05 WAL
     },
   };
   if (env.EVENT_LOG_PATH) cfg.eventLogPath = env.EVENT_LOG_PATH;

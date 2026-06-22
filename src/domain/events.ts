@@ -37,7 +37,8 @@ export interface Deposited {
 
 export interface Withdrawn {
   type: "Withdrawn";
-  amount: Frost;
+  amount: Frost; // gross — what leaves the player's balance
+  fee?: Frost; // house fee kept in the Sessions wallet (covers gas)
   custodyRef?: string;
 }
 

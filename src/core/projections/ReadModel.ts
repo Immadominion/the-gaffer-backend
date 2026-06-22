@@ -31,10 +31,12 @@ export class ReadModel {
   readonly settled = new SettledCallsProjection();
   private readonly projections: Projection[] = [this.dossier, this.pots, this.settled];
   private managersPot: Frost = 0n;
+  private houseRevenue: Frost = 0n; // accrued withdrawal fees (covers gas + margin)
 
   apply(event: StoredEvent): void {
     for (const p of this.projections) p.apply(event);
     if (event.payload.type === "PotSettled") this.managersPot += event.payload.rake;
+    if (event.payload.type === "Withdrawn" && event.payload.fee) this.houseRevenue += event.payload.fee;
   }
 
   /** Replay the whole log, then subscribe to the live tail. */
@@ -45,6 +47,10 @@ export class ReadModel {
 
   managersPotTotal(): Frost {
     return this.managersPot;
+  }
+
+  houseRevenueTotal(): Frost {
+    return this.houseRevenue;
   }
 
   /** The Squad Ladder — by GR (skill). This is the canonical ranking. */
