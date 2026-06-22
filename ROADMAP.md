@@ -51,3 +51,28 @@ This is what makes "on Walrus" true for the *money*, not only the memory.
 - Tune the economics (rake split, withdrawal fee, WAL volatility, the float).
 - **Custody / money-transmission review** before holding real user funds at scale — a
   deliberate legal/business decision, not a code change.
+
+## 7. Liquidity & cold-start — house / NPC bettors
+Parimutuel needs opponents: with too few players a match voids and refunds (the
+`minParticipants` rule). Seed each match's pools with synthetic "house" bettors so a real
+user always has a counterparty and bets settle for real — also the cleanest **demo** (no
+need to coordinate a second tester).
+**Trade-off:** bots make the **house a counterparty** — it funds the bot's stake and bears
+that side's risk — unlike pure player-vs-player where the house only takes rake. So cap and
+manage the house's bot exposure per match, and taper it as organic volume arrives.
+
+## 8. Ops, cost & abuse
+- **Rate-limit chat + verdicts** — every call hits the Anthropic API (real $); cap per user.
+- **Back up the sqlite ledger volume** until the Walrus mirror (§3) lands.
+- **Observability:** structured logs, error alerting, settlement monitoring + reconciliation
+  (ledger balances vs. on-chain wallet).
+- **Automate the memory loop:** auto-verdicts on big results + scheduled trait distillation
+  (today both are on-demand).
+- **Idempotent settlement on restart:** the 30s tick is in-process; make sure a redeploy
+  mid-settlement can't double-pay (event sourcing + expectedVersion already guards this —
+  add a test).
+
+## 9. UX / platform
+- Mobile-responsive pass (the 3D Gaffer + layouts are desktop-first).
+- Working search; richer notifications (email/push) beyond the in-app bell + .ics.
+- Move the 7×~25 MB `.glb` models to a CDN / Walrus blob (the repo is ~190 MB of binaries).
