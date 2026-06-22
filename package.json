@@ -10,6 +10,7 @@
     "start": "bun src/index.ts",
     "dev:live": "bun run scripts/dev-live.ts",
     "typecheck": "tsc --noEmit",
+    "gen:types": "bun run scripts/gen-web-types.ts",
     "test": "bun test",
     "smoke": "bun run scripts/smoke.ts",
     "check:memwal": "bun run scripts/memwal-check.ts",
